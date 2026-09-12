@@ -183,6 +183,8 @@ The query value is matched exactly against the `zoom` names in `zoom_areas`. Sta
 
 To use a different query parameter, configure its name, for example `url_parameters: { zoom: room }`, and navigate to `/dashboard-home/detail?room=kitchen`.
 
+The zoom query parameter can also be configured in the visual card editor under **URL Parameters**.
+
 
 ### Client Side Javascript template example
 

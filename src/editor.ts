@@ -168,6 +168,13 @@ export class Floor3dCardEditor extends LitElement implements LovelaceCardEditor 
       visible: false,
     };
 
+    const urlParametersOptions = {
+      icon: 'link-variant',
+      name: 'URL Parameters',
+      secondary: 'Map browser URL query parameters to card controls.',
+      show: false,
+    };
+
     const textOptions = {
       icon: 'format-text',
       name: 'Text',
@@ -271,6 +278,7 @@ export class Floor3dCardEditor extends LitElement implements LovelaceCardEditor 
             zoom_areas: this._entityOptionsZoomArray,
           },
         },
+        url_parameters: { ...urlParametersOptions },
         entities: {
           icon: 'tune',
           name: 'Entities',
@@ -356,7 +364,7 @@ export class Floor3dCardEditor extends LitElement implements LovelaceCardEditor 
       </div>
       ${this._createModelElement()} ${this._createAppearanceElement()}
       ${show ? html` ${this._createOverlayElement()} ` : ``} ${this._createEntitiesElement()}
-      ${this._createObjectGroupsElement()} ${this._createZoomAreasElement()}
+      ${this._createObjectGroupsElement()} ${this._createUrlParametersElement()} ${this._createZoomAreasElement()}
     `;
   }
 
@@ -716,6 +724,39 @@ export class Floor3dCardEditor extends LitElement implements LovelaceCardEditor 
                     @click=${this._addZoomArea}
                   ></ha-icon>
                 </div>
+              </div>
+            `
+          : ''}
+      </div>
+    `;
+  }
+
+  private _createUrlParametersElement(): TemplateResult {
+    if (!this.hass || !this._config) {
+      return html``;
+    }
+    const options = this._options.url_parameters;
+
+    return html`
+      <div class="card-config">
+        <div class="option" @click=${this._toggleThing} .options=${options} .optionsTarget=${this._options}>
+          <div class="row">
+            <ha-icon .icon=${`mdi:${options.icon}`}></ha-icon>
+            <div class="title">${options.name}</div>
+            <ha-icon .icon=${options.show ? `mdi:chevron-up` : `mdi:chevron-down`} style="margin-left: auto;"></ha-icon>
+          </div>
+          <div class="secondary">${options.secondary}</div>
+        </div>
+        ${options.show
+          ? html`
+              <div class="card-options" style="display: flex; flex-direction: column; align-items: left;">
+                <floor3d-textfield
+                  label="Zoom query parameter"
+                  fullwidth
+                  .value=${this._config.url_parameters?.zoom || ''}
+                  .configAttribute=${'zoom'}
+                  @input=${this._urlParameterChanged}
+                ></floor3d-textfield>
               </div>
             `
           : ''}
@@ -2906,6 +2947,35 @@ export class Floor3dCardEditor extends LitElement implements LovelaceCardEditor 
     this._config.entities = this._configArray;
     this._config.object_groups = this._configObjectArray;
     this._config.zoom_areas = this._configZoomArray;
+    fireEvent(this, 'config-changed', { config: this._config });
+  }
+
+  private _urlParameterChanged(ev): void {
+    if (!this._config || !this.hass) {
+      return;
+    }
+
+    const key = ev.target.configAttribute;
+    const value = ev.target.value;
+    const currentValue = this._config.url_parameters?.[key] || '';
+
+    if (currentValue == value) {
+      return;
+    }
+
+    const urlParameters = { ...this._config.url_parameters };
+    if (value == '') {
+      delete urlParameters[key];
+    } else {
+      urlParameters[key] = value;
+    }
+
+    if (Object.keys(urlParameters).length == 0) {
+      delete this._config.url_parameters;
+    } else {
+      this._config.url_parameters = urlParameters;
+    }
+
     fireEvent(this, 'config-changed', { config: this._config });
   }
 
