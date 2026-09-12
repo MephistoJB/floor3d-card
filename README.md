@@ -65,6 +65,7 @@ Assuming your model is called home.obj. You wait for some time (from few seconds
 | name             | string | Floor 3d     | the name of the card.                                                                                                                                                      |
 | entities         | array  | none         | list of enitities to bind to 3D model objects.                                                                                                                             |
 | object_groups    | array  | none         | list of object groups to apply grouped entity bindings.                                                                                                                    |
+| url_parameters   | object | none         | optional mapping of card features to browser URL query parameter names. Currently supports `zoom`.                                                                         |
 | style            | string | none         | the style that will be applied to the canvas element of the card.                                                                                                          |
 | path             | string | **Required** | path to the Waterforont obj (objects), mtl (material) and other files.                                                                                                     |
 | objfile          | string | **Required** | object file name (.obj) for Waterfront format or glb file name for the binary (condensed) 3d format (still experimental).                                                                                                                                 |
@@ -133,6 +134,54 @@ For each zoom in zoom_areas
 | direction        | object  | {x:0, y:0, z:0}   | the direction vector of the canera pointing to the area.                                                                                                                             |
 | distance        | number  | 500   | the number of cm from the camera to the target point                                                                                              |
 | level        | number  | - | the index of the level. If set, selecting this zoom level will show the level and hide the other levels.                                                                                 |
+
+### URL Parameters / Home Assistant Navigation
+
+The optional `url_parameters` configuration lets Home Assistant's native `navigate` action select a configured zoom area from the current browser URL. This state is entirely client-side and per browser; it does not require Home Assistant helpers, entities, backend state, or local storage.
+
+The `zoom` value is the query parameter name to read. It is configurable and is not limited to `area`:
+
+```yaml
+type: custom:floor3d-card
+path: /local/floor3d/
+objfile: home.glb
+url_parameters:
+  zoom: area
+zoom_areas:
+  - zoom: overview
+    object_id: House
+    distance: 1200
+  - zoom: kitchen
+    object_id: Kitchen_Floor
+    distance: 400
+  - zoom: livingroom
+    object_id: Livingroom_Floor
+    distance: 500
+```
+
+Navigate to the kitchen from a Home Assistant button:
+
+```yaml
+type: button
+name: Kitchen
+tap_action:
+  action: navigate
+  navigation_path: /dashboard-home/detail?area=kitchen
+```
+
+Or navigate to the living room:
+
+```yaml
+type: button
+name: Living room
+tap_action:
+  action: navigate
+  navigation_path: /dashboard-home/detail?area=livingroom
+```
+
+The query value is matched exactly against the `zoom` names in `zoom_areas`. Standard URL encoding is decoded by the browser. If `url_parameters` is not configured, the parameter is missing or empty, or the value does not match an initialized zoom area, the card keeps its existing/default behavior. Query-string changes made by Home Assistant navigation and browser back/forward navigation are handled without a full page reload.
+
+To use a different query parameter, configure its name, for example `url_parameters: { zoom: room }`, and navigate to `/dashboard-home/detail?room=kitchen`.
 
 
 ### Client Side Javascript template example

@@ -63,7 +63,7 @@ export class Floor3dCard extends LitElement {
   private _bboxmodel: THREE.Object3D;
   private _levels: THREE.Object3D[];
   private _displaylevels: boolean[];
-  private _zoom: any[];
+  private _zoom: any[] = [];
   private _selectedlevel: number;
   private _states?: string[];
   private _color?: number[][];
@@ -131,6 +131,8 @@ export class Floor3dCard extends LitElement {
   _helper: THREE.DirectionalLightHelper;
   private _modelready: boolean;
   private _maxtextureimage: number;
+  private _lastUrlZoomValue?: string | null;
+  private _locationChangedListener: EventListener;
 
   constructor() {
     super();
@@ -168,6 +170,7 @@ export class Floor3dCard extends LitElement {
       }
       this._render();
     };
+    this._locationChangedListener = () => this._applyUrlParameters();
     this._haShadowRoot = document.querySelector('home-assistant').shadowRoot;
     this._eval = eval;
     this._card_id = 'ha-card-1';
@@ -178,7 +181,11 @@ export class Floor3dCard extends LitElement {
   public connectedCallback(): void {
     super.connectedCallback();
 
+    window.addEventListener('location-changed', this._locationChangedListener);
+    window.addEventListener('popstate', this._locationChangedListener);
+
     if (this._modelready) {
+      this._applyUrlParameters();
       if (this._ispanel() || this._issidebar()) {
         this._resizeObserver.observe(this._card);
       }
@@ -200,6 +207,8 @@ export class Floor3dCard extends LitElement {
   public disconnectedCallback(): void {
     super.disconnectedCallback();
 
+    window.removeEventListener('location-changed', this._locationChangedListener);
+    window.removeEventListener('popstate', this._locationChangedListener);
     this._resizeObserver.disconnect();
     window.clearInterval(this._zIndexInterval);
 
@@ -401,6 +410,7 @@ export class Floor3dCard extends LitElement {
     }
 
     this._config = config;
+    this._lastUrlZoomValue = undefined;
     this._configArray = createConfigArray(this._config);
     this._object_ids = createObjectGroupConfigArray(this._config);
     this._initialmaterial = [];
@@ -1281,6 +1291,7 @@ export class Floor3dCard extends LitElement {
 
     console.log('Start Build Renderer');
     this._modelready = false;
+    this._lastUrlZoomValue = undefined;
 
     //create and initialize scene and camera
 
@@ -1497,6 +1508,8 @@ export class Floor3dCard extends LitElement {
 
       const initialLevel = typeof this._config.initialLevel === 'undefined' ? -1 : this._config.initialLevel;
       this._setVisibleLevel(initialLevel);
+
+      this._applyUrlParameters();
 
       this._resizeCanvas();
 
@@ -1825,7 +1838,15 @@ export class Floor3dCard extends LitElement {
   private _handleZoomClick(ev): void {
     ev.stopPropagation();
 
-    if (ev.target.index == -1) {
+    this._activateZoom(ev.target.index);
+  }
+
+  private _activateZoom(index: number): void {
+    if (!this._modelready || !this._camera || !this._controls) {
+      return;
+    }
+
+    if (index == -1) {
       this._setCamera();
 
       this._setLookAt();
@@ -1837,28 +1858,32 @@ export class Floor3dCard extends LitElement {
       return;
     }
 
-    const zoom = this._zoom[ev.target.index];
+    const zoom = this._zoom[index];
+
+    if (!zoom) {
+      return;
+    }
 
     if (zoom.level != null) {
       this._setVisibleLevel(zoom.level);
     }
 
     this._camera.position.set(
-      this._zoom[ev.target.index].position.x,
-      this._zoom[ev.target.index].position.y,
-      this._zoom[ev.target.index].position.z,
+      zoom.position.x,
+      zoom.position.y,
+      zoom.position.z,
     );
 
     this._camera.rotation.set(
-      this._zoom[ev.target.index].rotation.x,
-      this._zoom[ev.target.index].rotation.y,
-      this._zoom[ev.target.index].rotation.z,
+      zoom.rotation.x,
+      zoom.rotation.y,
+      zoom.rotation.z,
     );
 
     this._controls.target.set(
-      this._zoom[ev.target.index].target.x,
-      this._zoom[ev.target.index].target.y,
-      this._zoom[ev.target.index].target.z,
+      zoom.target.x,
+      zoom.target.y,
+      zoom.target.z,
     );
 
     this._camera.updateProjectionMatrix();
@@ -1866,6 +1891,49 @@ export class Floor3dCard extends LitElement {
     this._controls.update();
 
     this._render();
+  }
+
+  private _getUrlParameters(): { [key: string]: string | null } {
+    const values: { [key: string]: string | null } = {};
+    const configuredParameters = this._config && this._config.url_parameters;
+
+    if (!configuredParameters) {
+      return values;
+    }
+
+    const searchParameters = new URLSearchParams(window.location.search);
+    Object.keys(configuredParameters).forEach((property) => {
+      const parameterName = configuredParameters[property];
+      if (typeof parameterName == 'string' && parameterName.trim() != '') {
+        values[property] = searchParameters.get(parameterName.trim());
+      }
+    });
+
+    return values;
+  }
+
+  private _applyUrlParameters(): void {
+    if (!this._modelready || !this._camera || !this._controls || !this._zoom) {
+      return;
+    }
+
+    const urlZoomValue = this._getUrlParameters().zoom;
+    const normalizedZoomValue = urlZoomValue && urlZoomValue != '' ? urlZoomValue : null;
+
+    if (normalizedZoomValue === this._lastUrlZoomValue) {
+      return;
+    }
+
+    this._lastUrlZoomValue = normalizedZoomValue;
+
+    if (normalizedZoomValue == null) {
+      return;
+    }
+
+    const zoomIndex = this._zoom.findIndex((zoom) => zoom.name === normalizedZoomValue);
+    if (zoomIndex != -1) {
+      this._activateZoom(zoomIndex);
+    }
   }
 
   private _handleLevelClick(ev): void {
@@ -2472,6 +2540,8 @@ export class Floor3dCard extends LitElement {
   // manage all entity types
 
   private _manageZoom(): void {
+    this._zoom = [];
+
     if (this._config.zoom_areas) {
       this._config.zoom_areas.forEach((element) => {
         // For each element of the Zoom Area array calculate zoom position and initialize zoom array

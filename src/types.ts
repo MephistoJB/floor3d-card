@@ -9,6 +9,11 @@ declare global {
 }
 
 // TODO Add your configuration elements here for type-checking
+export interface UrlParametersConfig {
+  zoom?: string;
+  [property: string]: string | undefined;
+}
+
 export interface Floor3dCardConfig {
   type: string;
   path: string;
@@ -51,6 +56,7 @@ export interface Floor3dCardConfig {
   object_groups: any;
   object_group: string;
   zoom_areas: any;
+  url_parameters?: UrlParametersConfig;
   objects: any;
   lumens: number;
   decay: number;
